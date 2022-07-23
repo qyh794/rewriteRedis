@@ -1,2 +1,2 @@
 # rewriteRedis
-rewriteRedis by golang
+rewriteRedis by Golang
