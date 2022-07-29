@@ -65,6 +65,8 @@ func parse(reader io.Reader, ch chan<- *Payload) {
 		if !state.readingMultiLine {
 			if curMsg[0] == '*' {
 				err = parseMultiBulkHeader(curMsg, &state)
+
+				//err = parseMultiBulkHeader1(curMsg, &state)
 				if err != nil {
 					ch <- &Payload{
 						Err: err,
@@ -134,77 +136,83 @@ func parse(reader io.Reader, ch chan<- *Payload) {
 
 // readLine 以\r\n读取一行用户指令, 返回的是 *3\r\n 或者 $3\r\n
 func readLine(br *bufio.Reader, state *parserState) ([]byte, bool, error) {
-	msg := make([]byte, state.bulkLen)
+	//msg := make([]byte, state.bulkLen)
+	var curMsg []byte
+	var err error
 	if state.bulkLen == 0 { // 1.如果没有读到$,字节组数据块的长度等于0,按照\r\n
-		msg, err := br.ReadBytes('\n')
+		curMsg, err = br.ReadBytes('\n')
 		if err != nil { // io错误
 			return nil, true, err
 		}
-		if len(msg) == 0 || msg[len(msg)-2] != '\r' {
-			return nil, false, errors.New("protocol error: " + string(msg))
+		if len(curMsg) == 0 || curMsg[len(curMsg)-2] != '\r' {
+			return nil, false, errors.New("protocol error: " + string(curMsg))
 		}
 	} else { //2.如果读到了$,那么只能连续读取$后面数字个字符 + \r\n 才能结束
-		msg = make([]byte, state.bulkLen+2)
+		curMsg = make([]byte, state.bulkLen+2)
 		//把 br里的数据读到msg中
-		_, err := io.ReadFull(br, msg)
+		_, err = io.ReadFull(br, curMsg)
 		if err != nil {
 			return nil, true, err
 		}
-		if len(msg) == 0 || msg[len(msg)-1] != '\n' || msg[len(msg)-2] != '\r' {
-			return nil, false, errors.New("protocol error: " + string(msg))
+		if len(curMsg) == 0 || curMsg[len(curMsg)-1] != '\n' || curMsg[len(curMsg)-2] != '\r' {
+			return nil, false, errors.New("protocol error: " + string(curMsg))
 		}
+		state.bulkLen = 0
 	}
-	return msg, false, nil
+	return curMsg, false, nil
 }
 
 // parseMultiBulkHeader 第一次读取用户指令,应当设置解析器的状态,处理以*3\r\n开头的指令
-func parseMultiBulkHeader(msg []byte, state *parserState) error {
+func parseMultiBulkHeader(curMsg []byte, state *parserState) error {
 	// expected读取的指令应该有的参数个数,也是[][]msg的长度
-	expected, err := strconv.ParseInt(string(msg[1:len(msg)-2]), 10, 64)
+	var expected uint64
+	expected, err := strconv.ParseUint(string(curMsg[1:len(curMsg)-2]), 10, 32)
+	//expected, err := strconv.ParseInt(string(msg[1:len(msg)-2]), 10, 32)
 	if err != nil {
-		return errors.New("protocol error: " + string(msg))
+		return errors.New("protocol error: " + string(curMsg))
 	}
 	if expected == 0 { // *0\r\n、$0\r\n
 		state.expectedArgsCount = 0
 		return nil
-	} else if expected < 0 { // $-1\r\n
-		return errors.New("protocol error: " + string(msg))
+	} else if expected > 0 { // $-1\r\n
+		// 变为多行模式
+		state.readingMultiLine = true
+		// 设置参数个数
+		state.expectedArgsCount = int(expected)
+		// 设置参数类型
+		state.msgType = curMsg[0]
+		// 初始化[][]msg
+		state.msg = make([][]byte, 0, expected)
+		return nil
+	} else {
+		return errors.New("protocol error: " + string(curMsg))
 	}
-	// 变为多行模式
-	state.readingMultiLine = true
-	// 设置参数个数
-	state.expectedArgsCount = int(expected)
-	// 设置参数类型
-	state.msgType = msg[0]
-	// 初始化[][]msg
-	state.msg = make([][]byte, 0, expected)
-	return nil
 }
 
 // parseBulkHeader 第一次读取用户指令,解析单行指令, 例如 以$4\r\n开头
-func parseBulkHeader(msg []byte, state *parserState) error {
+func parseBulkHeader(curMsg []byte, state *parserState) error {
 	var err error
 	// $4\r\n, bulkLen = 4
-	state.bulkLen, err = strconv.ParseInt(string(msg[1:len(msg)-2]), 10, 64)
+	state.bulkLen, err = strconv.ParseInt(string(curMsg[1:len(curMsg)-2]), 10, 64)
 	if err != nil {
-		return errors.New("protocol error: " + string(msg))
+		return errors.New("protocol error: " + string(curMsg))
 	}
 	if state.bulkLen > 0 { // ping\r\n -> [[ping]]
 		state.readingMultiLine = true
-		state.msgType = msg[0]
+		state.msgType = curMsg[0]
 		state.expectedArgsCount = 1
 		state.msg = make([][]byte, 0, 1)
 		return nil
 	} else {
-		return errors.New("protocol error: " + string(msg))
+		return errors.New("protocol error: " + string(curMsg))
 	}
 }
 
 // parseSingleLine 解析单行指令 +ok\r\n、-err\r\n,碰到这种直接按照类型返回
-func parseSingleLine(msg []byte) (resp.Reply, error) {
-	str := string(msg[1 : len(msg)-2])
+func parseSingleLine(curMsg []byte) (resp.Reply, error) {
+	str := string(curMsg[1 : len(curMsg)-2])
 	var res resp.Reply
-	switch msg[0] {
+	switch curMsg[0] {
 	case '+':
 		res = reply.NewStatusReply(str)
 	case '-':
@@ -212,7 +220,7 @@ func parseSingleLine(msg []byte) (resp.Reply, error) {
 	case ':':
 		code, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
-			return nil, errors.New("protocol error: " + string(msg))
+			return nil, errors.New("protocol error: " + string(curMsg))
 		}
 		res = reply.NewIntReply(code)
 	}
@@ -220,20 +228,20 @@ func parseSingleLine(msg []byte) (resp.Reply, error) {
 }
 
 // readBody 非第一次读取用户指令,例如读取到第二行$3\r\n或者set\r\n
-func readBody(msg []byte, state *parserState) error {
-	curMsg := msg[:len(msg)-2]
+func readBody(curMsg []byte, state *parserState) error {
+	line := curMsg[:len(curMsg)-2]
 	var err error
-	if curMsg[0] == '$' { // $3\r\n
-		state.bulkLen, err = strconv.ParseInt(string(curMsg), 10, 64)
+	if line[0] == '$' { // $3\r\n
+		state.bulkLen, err = strconv.ParseInt(string(line[1:]), 10, 64)
 		if err != nil {
-			return errors.New("protocol error: " + string(msg))
+			return errors.New("protocol error: " + string(curMsg))
 		}
 		if state.bulkLen <= 0 { //$0\r\n, 往[][]msg中加入空切片即可
 			state.msg = append(state.msg, []byte{})
 			state.bulkLen = 0
 		}
 	} else {
-		state.msg = append(state.msg, curMsg)
+		state.msg = append(state.msg, line)
 	}
 	return nil
 }
