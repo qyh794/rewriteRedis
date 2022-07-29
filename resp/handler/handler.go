@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"rewriteRedis/database"
 	databaseface "rewriteRedis/interface/database"
 	"rewriteRedis/lib/logger"
 	"rewriteRedis/lib/sync/atomic"
@@ -22,15 +23,19 @@ type respHandler struct {
 }
 
 func NewHandler() *respHandler {
-	return &respHandler{}
+	var db databaseface.Database
+	db = database.NewEchoDatabase()
+	return &respHandler{
+		db: db,
+	}
 }
 
-func (r respHandler) closeConn(respConn *connection.RespConnection) {
+func (r *respHandler) closeConn(respConn *connection.RespConnection) {
 	_ = respConn.Close()
 	r.activeConn.Delete(respConn)
 }
 
-func (r respHandler) Handle(ctx context.Context, conn net.Conn) {
+func (r *respHandler) Handle(ctx context.Context, conn net.Conn) {
 	// 新建一个resp连接
 	respConn := connection.NewRespConnection(conn)
 	// 保存连接
@@ -64,7 +69,11 @@ func (r respHandler) Handle(ctx context.Context, conn net.Conn) {
 				continue
 			}
 			// 有数据
-			bulkReply := payload.Data.(*reply.MultiBulkReply)
+			bulkReply, ok := payload.Data.(*reply.MultiBulkReply)
+			if !ok {
+				logger.Error("require multi bulk reply")
+				continue
+			}
 			res := r.db.Exec(respConn, bulkReply.Msg)
 			if res != nil {
 				_ = respConn.Write(res.ToByte())
@@ -75,7 +84,14 @@ func (r respHandler) Handle(ctx context.Context, conn net.Conn) {
 	}
 }
 
-func (r respHandler) Close() error {
-	//TODO implement me
-	panic("implement me")
+func (r *respHandler) Close() error {
+	logger.Info("resp Handler shutting down...")
+	r.closing.Set(true)
+	r.activeConn.Range(func(key, value any) bool {
+		respConn := key.(*connection.RespConnection)
+		_ = respConn.Close()
+		return true
+	})
+	r.db.Close()
+	return nil
 }
