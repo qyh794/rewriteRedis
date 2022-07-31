@@ -18,15 +18,15 @@ var unKnownErrReply = []byte("-Err unknown\r\n")
 
 type respHandler struct {
 	activeConn sync.Map // 活跃的连接
-	db         databaseface.Database
+	database   databaseface.Database
 	closing    atomic.Boolean
 }
 
 func NewHandler() *respHandler {
 	var db databaseface.Database
-	db = database.NewEchoDatabase()
+	db = database.NewDatabase()
 	return &respHandler{
-		db: db,
+		database: db,
 	}
 }
 
@@ -74,7 +74,7 @@ func (r *respHandler) Handle(ctx context.Context, conn net.Conn) {
 				logger.Error("require multi bulk reply")
 				continue
 			}
-			res := r.db.Exec(respConn, bulkReply.Msg)
+			res := r.database.Exec(respConn, bulkReply.Msg)
 			if res != nil {
 				_ = respConn.Write(res.ToByte())
 			} else {
@@ -92,6 +92,6 @@ func (r *respHandler) Close() error {
 		_ = respConn.Close()
 		return true
 	})
-	r.db.Close()
+	r.database.Close()
 	return nil
 }
