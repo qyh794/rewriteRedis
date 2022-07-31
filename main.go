@@ -1,19 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"rewriteRedis/config"
 	"rewriteRedis/lib/logger"
+	"rewriteRedis/resp/handler"
 	"rewriteRedis/tcp"
-	"fmt"
 )
 
 // 配置文件名称
 var confFile string = "redis.conf"
 
 // 默认配置文件
-var defaultProperties = &config.ServerProperties {
-	Bind: "0.0.0.0", 
+var defaultProperties = &config.ServerProperties{
+	Bind: "0.0.0.0",
 	Port: 8888,
 }
 
@@ -24,9 +25,9 @@ func fileExists(filename string) bool {
 
 func main() {
 	logger.Setup(&logger.Settings{
-		Path: "logs",
-		Name: "rewriteRedis",
-		Ext: "log",
+		Path:       "logs",
+		Name:       "rewriteRedis",
+		Ext:        "log",
 		TimeFormat: "2006-01-02",
 	})
 	if fileExists(confFile) {
@@ -36,9 +37,10 @@ func main() {
 	}
 	err := tcp.ListenAndServerWithSignal(&tcp.Config{
 		Address: fmt.Sprintf("%s:%d", config.Properties.Bind, config.Properties.Port),
-	}, tcp.NewEchoRedisHandler())
+	}, handler.NewHandler())
 	if err != nil {
 		logger.Info("something wrong with main")
 		logger.Error(err)
 	}
+
 }
