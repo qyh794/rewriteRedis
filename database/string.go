@@ -2,6 +2,7 @@ package database
 
 import (
 	"rewriteRedis/interface/resp"
+	"rewriteRedis/lib/utils"
 	"rewriteRedis/resp/reply"
 )
 
@@ -21,6 +22,7 @@ func execSet(db *DB, msg [][]byte) resp.Reply {
 	key := string(msg[0])
 	val := msg[1]
 	db.SetEntity(key, val)
+	db.addAof(utils.ToCmdLine2("SET", msg...))
 	return reply.NewOKReply()
 }
 
@@ -29,6 +31,7 @@ func execSetNX(db *DB, msg [][]byte) resp.Reply {
 	key := string(msg[0])
 	val := msg[1]
 	res := db.SetIfAbsent(key, val)
+	db.addAof(utils.ToCmdLine2("SETNX", msg...))
 	return reply.NewIntReply(int64(res))
 }
 
@@ -41,6 +44,8 @@ func execGetSet(db *DB, msg [][]byte) resp.Reply {
 	if !exists {
 		return reply.NewNullBulkReply()
 	}
+	db.addAof(utils.ToCmdLine2("GETSET", msg...))
+
 	// 返回key的旧值
 	return reply.NewBulkReply(old.([]byte))
 }
