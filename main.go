@@ -10,7 +10,7 @@ import (
 )
 
 // 配置文件名称
-var confFile string = "redis.conf"
+const confFile string = "redis.conf"
 
 // 默认配置文件
 var defaultProperties = &config.ServerProperties{
@@ -20,7 +20,7 @@ var defaultProperties = &config.ServerProperties{
 
 func fileExists(filename string) bool {
 	fi, err := os.Stat(filename)
-	return err == nil && fi.IsDir()
+	return err == nil && !fi.IsDir()
 }
 
 func main() {
