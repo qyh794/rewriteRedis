@@ -2,6 +2,7 @@ package database
 
 import (
 	"rewriteRedis/interface/resp"
+	"rewriteRedis/lib/utils"
 	"rewriteRedis/resp/reply"
 )
 
@@ -12,6 +13,9 @@ func execDel(db *DB, msg [][]byte) resp.Reply {
 		keys[i] = string(v)
 	}
 	deleted := db.RemoveKeys(keys...)
+	if deleted > 0 {
+		db.addAof(utils.ToCmdLine2("DEL", msg...))
+	}
 	return reply.NewIntReply(int64(deleted))
 }
 
@@ -31,6 +35,7 @@ func execExists(db *DB, msg [][]byte) resp.Reply {
 // execFlushDB 清空当前数据库
 func execFlushDB(db *DB, msg [][]byte) resp.Reply {
 	db.Flush()
+	db.addAof(utils.ToCmdLine2("FLUSHDB", msg...))
 	return reply.NewOKReply()
 }
 
@@ -59,6 +64,7 @@ func execRename(db *DB, msg [][]byte) resp.Reply {
 	newKey := string(msg[1])
 	db.Remove(old)
 	db.SetEntity(newKey, oldVal)
+	db.addAof(utils.ToCmdLine2("RENAME", msg...))
 	return reply.NewOKReply()
 }
 
@@ -76,6 +82,7 @@ func execRenameNx(db *DB, msg [][]byte) resp.Reply {
 	}
 	db.Remove(old)
 	db.SetEntity(newKey, val)
+	db.addAof(utils.ToCmdLine2("RENAMENX", msg...))
 	return reply.NewIntReply(int64(1))
 }
 
