@@ -9,14 +9,16 @@ import (
 )
 
 type DB struct {
-	index int       // 分数据库的编号
-	data  dict.Dict // 分数据库
+	index  int       // 分数据库的编号
+	data   dict.Dict // 分数据库
+	addAof func(msg [][]byte)
 }
 
 // 构造函数
 func NewDB() *DB {
 	return &DB{
-		data: dict.NewSyncMap(),
+		data:   dict.NewSyncMap(),
+		addAof: func(msg [][]byte) {},
 	}
 }
 
