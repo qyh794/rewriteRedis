@@ -4,7 +4,8 @@ rewriteRedis by Golang
 
 参考开源项目https://github.com/HDT3213/godis
 
-实现了redis的部分功能,8大数据类型目前只实现了string
+实现了redis的部分功能,8大数据类型目前只实现了string,如果想实现更完整的go版本redis请前往大佬写的开源项目https://github.com/HDT3213/godis
+
 
 单机版已经实现指令：
 
