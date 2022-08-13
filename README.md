@@ -7,12 +7,19 @@ rewriteRedis by Golang
 实现了redis的部分功能
 
 单机版已经实现指令：
+
   set key val
+  
   get key
+  
   setnx key val
+  
   getset key val
+  
   strlen key
+  
   del key1, key2...
+  
   exists key1, key2...
   flushdb
   type key
