@@ -197,11 +197,14 @@ func parseBulkHeader(curMsg []byte, state *parserState) error {
 	if err != nil {
 		return errors.New("protocol error: " + string(curMsg))
 	}
+	
 	if state.bulkLen > 0 { // ping\r\n -> [[ping]]
 		state.readingMultiLine = true
 		state.msgType = curMsg[0]
 		state.expectedArgsCount = 1
 		state.msg = make([][]byte, 0, 1)
+		return nil
+	} else if state.bulkLen == -1 {
 		return nil
 	} else {
 		return errors.New("protocol error: " + string(curMsg))
