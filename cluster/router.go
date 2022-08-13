@@ -22,6 +22,7 @@ func makeRouter() map[string]CmdFunc {
 	routerMap["EXISTS"] = exists
 	routerMap["FLUSHDB"] = flushDB
 	routerMap["RENAME"] = rename
+	routerMap["SELECT"] = execSelect
 	return routerMap
 }
 
@@ -135,29 +136,6 @@ func rename(cluster *ClusterDatabase, respConn resp.Connection, cmdMsg [][]byte)
 	return reply.NewOKReply()
 }
 
-// keys 群发指令 keys *
-//func keys(cluster *ClusterDatabase, respConn resp.Connection, cmdMsg [][]byte) resp.Reply {
-//	resMap := make(map[string]*reply.MultiBulkReply)
-//	for i := 0; i < len(cluster.peers); i++ {
-//		relay := cluster.relay(cluster.peers[i], respConn, cmdMsg) // MultiBulkReply {msg [][]byte}
-//		bulkReply, ok := relay.(*reply.MultiBulkReply)
-//		if bulkReply == nil {
-//			continue
-//		}
-//		if !ok {
-//			return reply.NewStanderErrReply("something wrong with cluster keys()")
-//		}
-//		resMap[cluster.peers[i]] = bulkReply
-//	}
-//	var res [][]byte
-//	for _, v := range resMap {
-//		if res == nil {
-//			res = v.Msg
-//			continue
-//		}
-//		for i := 0; i < len(v.Msg); i++ {
-//			res = append(res, v.Msg[i])
-//		}
-//	}
-//	return reply.NewMultiBulkReply(res)
-//}
+func execSelect(cluster *ClusterDatabase, respConn resp.Connection, cmdMsg [][]byte) resp.Reply {
+	return cluster.database.Exec(respConn, cmdMsg)
+}
