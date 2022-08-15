@@ -31,7 +31,7 @@ type ClusterDatabase struct {
 func NewClusterDatabase() *ClusterDatabase {
 	cluster := &ClusterDatabase{
 		self:           config.Properties.Self,
-		peerPicker:     consistenthash.NewNodeMap(nil),
+		peerPicker:     consistenthash.NewNodeMap(nil, 10),
 		peerConnection: make(map[string]*pool.ObjectPool),
 		database:       database.NewDatabase(),
 	}
