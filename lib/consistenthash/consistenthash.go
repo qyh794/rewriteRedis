@@ -3,6 +3,7 @@ package consistenthash
 import (
 	"hash/crc32"
 	"sort"
+	"strconv"
 )
 
 type HashFunc func(data []byte) uint32
@@ -12,13 +13,15 @@ type NodeMap struct {
 	hashFunc    HashFunc       // 哈希函数,根据key判断节点
 	nodeHash    []int          // 哈希环,保存各个节点的哈希值
 	nodeHashMap map[int]string // 节点哈希值到物理节点的映射
+	replicas    int            // 虚拟节点
 }
 
 // NewNodeMap 一致性哈希管理器构造方法
-func NewNodeMap(hashFunc HashFunc) *NodeMap {
+func NewNodeMap(hashFunc HashFunc, replicas int) *NodeMap {
 	m := &NodeMap{
 		hashFunc:    hashFunc,
 		nodeHashMap: make(map[int]string),
+		replicas:    replicas,
 	}
 	if m.hashFunc == nil {
 		m.hashFunc = crc32.ChecksumIEEE
@@ -32,12 +35,12 @@ func (m *NodeMap) AddNode(keys ...string) {
 		if keys[i] == "" {
 			continue
 		}
-
-		// 哈希函数计算出来的哈希值类型为unit32,需要把哈希值放入哈希环中,哈希环中元素为int类型
-		hash := int(m.hashFunc([]byte(keys[i])))
-		m.nodeHash = append(m.nodeHash, hash)
-		m.nodeHashMap[hash] = keys[i]
-
+		for j := 0; j < m.replicas; j++ {
+			// 哈希函数计算出来的哈希值类型为unit32,需要把哈希值放入哈希环中,哈希环中元素为int类型
+			hash := int(m.hashFunc([]byte(strconv.Itoa(j) + keys[i])))
+			m.nodeHash = append(m.nodeHash, hash)
+			m.nodeHashMap[hash] = keys[i]
+		}
 	}
 	sort.Ints(m.nodeHash)
 }
