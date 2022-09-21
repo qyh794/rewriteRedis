@@ -97,3 +97,4 @@ func (s *syncMap) RandomDistinctKeys(limit int) []string {
 func (s *syncMap) Clear() {
 	s = NewSyncMap()
 }
+
