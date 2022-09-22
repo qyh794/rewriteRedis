@@ -57,7 +57,7 @@ func parse(reader io.Reader, ch chan<- *Payload) {
 			ch <- &Payload{
 				Err: err,
 			}
-			// 重置解析器状态
+			// 重置解析器状态 
 			state = parserState{}
 			continue
 		}
