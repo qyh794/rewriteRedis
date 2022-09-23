@@ -3,6 +3,7 @@ package dict
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 )
 
 type ConcurrentDict struct {
@@ -103,6 +104,7 @@ func (c *ConcurrentDict) Set(key string, val interface{}) int {
 	}
 	// 添加key,返回1
 	curShard.m[key] = val
+	c.addCount()
 	return 1
 }
 
@@ -136,7 +138,16 @@ func (c *ConcurrentDict) SetIfAbsent(key string, val interface{}) int {
 	}
 	// 如果key不存在添加key,返回
 	curShard.m[key] = val
+	c.addCount()
 	return 1
+}
+
+func (c *ConcurrentDict) addCount() int32 {
+	return atomic.AddInt32(&c.count, 1)
+}
+
+func (c *ConcurrentDict) decreaseCount() int32 {
+	return atomic.AddInt32(&c.count, -1)
 }
 
 func (c *ConcurrentDict) Remove(key string) int {
@@ -157,6 +168,7 @@ func (c *ConcurrentDict) Remove(key string) int {
 	// 如果key存在则删除
 	if _, exists := curShard.m[key]; exists {
 		delete(curShard.m, key)
+		c.decreaseCount()
 		return 1
 	}
 	// 如果key不存在,返回
